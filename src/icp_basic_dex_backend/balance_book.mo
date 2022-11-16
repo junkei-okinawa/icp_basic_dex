@@ -1,6 +1,8 @@
 import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
+import Hash "mo:base/Hash";
+import AssocList "mo:base/AssocList";
 
 import T "types";
 
@@ -8,7 +10,11 @@ module {
   public class BalanceBook() {
     // ユーザーとトークンの種類・量をマッピング
     var balance_book = HashMap.HashMap<Principal, HashMap.HashMap<T.Token, Nat>>(10, Principal.equal, Principal.hash);
-
+    
+    public func get(user : Principal) : ?HashMap.HashMap<T.Token, Nat> {
+      return balance_book.get(user);
+    };
+    
     // ユーザーの預け入れを記録する
     public func addToken(user : Principal, token : T.Token, amount : Nat) {
       // ユーザーのデータがあるかどうか

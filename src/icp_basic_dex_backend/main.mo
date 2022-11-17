@@ -4,12 +4,15 @@ import HashMap "mo:base/HashMap";
 import Principal "mo:base/Principal";
 
 import BalanceBook "balance_book";
+import Exchange "exchange";
 import T "types";
 
 actor class Dex() = this {
 
   // DEXのユーザートークンを管理するモジュール
   private var balance_book = BalanceBook.BalanceBook();
+  // オーダーを管理するモジュール
+  private var exchange = Exchange.Exchange(balance_book);
 
   // ===== DEPOSIT / WITHDRAW =====
   // ユーザーがDEXにトークンを預ける時にコールする
@@ -66,12 +69,88 @@ actor class Dex() = this {
     return #Ok(amount);
   };
 
+  // ===== ORDER =====
+  // ユーザーがオーダーを作成する時にコールされる
+  // 成功するとオーダーの内容が、失敗するとエラー文を返す
+  public shared (msg) func placeOrder(
+    from : T.Token,
+    fromAmount : Nat,
+    to : T.Token,
+    toAmount : Nat,
+  ) : async T.PlaceOrderReceipt {
+
+    // ユーザーが`from`トークンで別のオーダーを出していないことを確認
+    for (order in exchange.getOrders().vals()) {
+      if (msg.caller == order.owner and from == order.from) {
+        return (#Err(#OrderBookFull));
+      };
+    };
+
+    // ユーザーが十分なトークン量を持っているか確認
+    if (balance_book.hasEnoughBalance(msg.caller, from, fromAmount) == false) {
+      Debug.print("Not enough balance for user " # Principal.toText(msg.caller) # " in token " # Principal.toText(from));
+      return (#Err(#InvalidOrder));
+    };
+
+    // オーダーのIDを取得する
+    let id : Nat32 = nextId();
+    // `placeOrder`を呼び出したユーザーPrincipalを変数に格納する
+    // msg.callerのままだと、下記の構造体に設定できないため
+    let owner = msg.caller;
+
+    // オーダーを作成する
+    let order : T.Order = {
+      id;
+      owner;
+      from;
+      fromAmount;
+      to;
+      toAmount;
+    };
+    exchange.addOrder(order);
+
+    return (#Ok(exchange.getOrder(id)));
+  };
+
+  // ユーザーがオーダーを削除する時にコールされる
+  // 成功したら削除したオーダーのIDを、失敗したらエラー文を返す
+  public shared (msg) func cancelOrder(order_id : T.OrderId) : async T.CancelOrderReceipt {
+    // オーダーがあるかどうか
+    switch (exchange.getOrder(order_id)) {
+      case null return (#Err(#NotExistingOrder));
+      case (?order) {
+        // キャンセルしようとしているユーザーが、売り注文を作成したユーザー（所有者）と一致するかどうかをチェックする
+        if (msg.caller != order.owner) {
+          return (#Err(#NotAllowed));
+        };
+        // `cancleOrder`を実行する
+        switch (exchange.cancelOrder(order_id)) {
+          case null return (#Err(#NotExistingOrder));
+          case (?cancel_order) {
+            return (#Ok(cancel_order.id));
+          };
+        };
+      };
+    };
+  };
+
+  // Get all sell orders
+  public query func getOrders() : async ([T.Order]) {
+    return (exchange.getOrders());
+  };
+
   // ===== INTERNAL FUNCTIONS =====
   // トークンに設定された`fee`を取得する
   private func fetch_dif_fee(token : T.Token) : async Nat {
     let dip20 = actor (Principal.toText(token)) : T.DIPInterface;
     let metadata = await dip20.getMetadata();
     return (metadata.fee);
+  };
+
+  // オーダーのIDを更新して返す
+  private func nextId() : Nat32 {
+    last_id += 1;
+    return (last_id);
   };
 
   // ===== DEX STATE FUNCTIONS =====

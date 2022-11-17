@@ -14,6 +14,8 @@ actor class Dex() = this {
   // オーダーを管理するモジュール
   private var exchange = Exchange.Exchange(balance_book);
 
+  private var last_id : Nat32 = 0;
+
   // ===== DEPOSIT / WITHDRAW =====
   // ユーザーがDEXにトークンを預ける時にコールする
   // 成功すると預けた量を、失敗するとエラー文を返す
@@ -88,7 +90,6 @@ actor class Dex() = this {
 
     // ユーザーが十分なトークン量を持っているか確認
     if (balance_book.hasEnoughBalance(msg.caller, from, fromAmount) == false) {
-      Debug.print("Not enough balance for user " # Principal.toText(msg.caller) # " in token " # Principal.toText(from));
       return (#Err(#InvalidOrder));
     };
 

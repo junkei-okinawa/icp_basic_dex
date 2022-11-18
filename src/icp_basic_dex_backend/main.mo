@@ -11,10 +11,13 @@ actor class Dex() = this {
 
   // DEXのユーザートークンを管理するモジュール
   private var balance_book = BalanceBook.BalanceBook();
+  
+  // オーダーのIDを管理する変数
+  private var last_id : Nat32 = 0;
+  
   // オーダーを管理するモジュール
   private var exchange = Exchange.Exchange(balance_book);
 
-  private var last_id : Nat32 = 0;
 
   // ===== DEPOSIT / WITHDRAW =====
   // ユーザーがDEXにトークンを預ける時にコールする

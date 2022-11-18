@@ -6,6 +6,9 @@ import { canisterId as IICanisterID }
 
 export const Header = (props) => {
   const {
+    updateOrderList,
+    updateUserTokens,
+    setAgent,
     setUserPrincipal,
   } = props;
 
@@ -15,9 +18,23 @@ export const Header = (props) => {
 
     // 認証したユーザーの`principal`を取得
     const principal = identity.getPrincipal();
-    setUserPrincipal(principal);
 
     console.log(`User Principal: ${principal.toString()}`);
+
+    // 取得した`identity`を使用して、ICと対話する`agent`を作成する
+    const newAgent = new HttpAgent({ identity });
+    if (process.env.DFX_NETWORK === "local") {
+      newAgent.fetchRootKey();
+    }
+
+    // 認証したユーザーが保有するトークンのデータを取得
+    updateUserTokens(principal);
+    // オーダー一覧を取得
+    updateOrderList();
+
+    // ユーザーのデータを保存
+    setUserPrincipal(principal);
+    setAgent(newAgent);
   };
 
   const handleLogin = async () => {

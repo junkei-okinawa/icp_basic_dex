@@ -8,12 +8,17 @@ import Exchange "exchange";
 import T "types";
 
 actor class Dex() = this {
+  // アップグレード時にオーダーを保存しておく`Stable`変数
+  private stable var ordersEntries : [T.Order] = [];
+
+  // DEXに預けたユーザーのトークン残高を保存する`Stable`変数
+  private stable var balanceBookEntries : [var (Principal, [(T.Token, Nat)])] = [var];
 
   // DEXのユーザートークンを管理するモジュール
   private var balance_book = BalanceBook.BalanceBook();
   
   // オーダーのIDを管理する変数
-  private var last_id : Nat32 = 0;
+  private stable var last_id : Nat32 = 0;
   
   // オーダーを管理するモジュール
   private var exchange = Exchange.Exchange(balance_book);
@@ -159,9 +164,9 @@ actor class Dex() = this {
 
   // ===== DEX STATE FUNCTIONS =====
   // 引数で渡されたトークンPrincipalの残高を取得する
-  public shared query (msg) func getBalance(token : T.Token) : async Nat {
+  public shared query func getBalance(user : Principal, token : T.Token) : async Nat {
     // ユーザーのデータがあるかどうか
-    switch (balance_book.get(msg.caller)) {
+    switch (balance_book.get(user)) {
       case null return 0;
       case (?token_balances) {
         // トークンのデータがあるかどうか
@@ -173,5 +178,37 @@ actor class Dex() = this {
         };
       };
     };
+  };
+
+  // ===== UPGRADE =====
+  system func preupgrade() {
+    // DEXに預けられたトークンデータを`Array`に保存
+    balanceBookEntries := Array.init(balance_book.size(), (Principal.fromText("aaaaa-aa"), []));
+    var i = 0;
+    for ((x, y) in balance_book.entries()) {
+      balanceBookEntries[i] := (x, Iter.toArray(y.entries()));
+      i += 1;
+    };
+
+    // book内で管理しているオーダーを保存
+    ordersEntries := exchange.getOrders();
+  };
+
+  // キャニスターのアップグレード後、`Array`から`HashMap`に再構築する。
+  system func postupgrade() {
+    // `balance_book`を再構築
+    for ((key : Principal, value : [(T.Token, Nat)]) in balanceBookEntries.vals()) {
+      let tmp : HashMap.HashMap<T.Token, Nat> = HashMap.fromIter<T.Token, Nat>(Iter.fromArray<(T.Token, Nat)>(value), 10, Principal.equal, Principal.hash);
+      balance_book.put(key, tmp);
+    };
+
+    // オーダーを再構築
+    for (order in ordersEntries.vals()) {
+      exchange.addOrder(order);
+    };
+
+    // `Stable`に使用したメモリをクリアする.
+    balanceBookEntries := [var];
+    ordersEntries := [];
   };
 };

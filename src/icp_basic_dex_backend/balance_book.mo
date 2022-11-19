@@ -11,6 +11,24 @@ module {
     // ユーザーとトークンの種類・量をマッピング
     var balance_book = HashMap.HashMap<Principal, HashMap.HashMap<T.Token, Nat>>(10, Principal.equal, Principal.hash);
     
+    // ユーザーと預け入れたトークンデータを追加する
+    // `postupgrade`を実行する際に使用される
+    public func put(user : Principal, userBalances : HashMap.HashMap<T.Token, Nat>) {
+      balance_book.put(user, userBalances);
+    };
+    
+    // ユーザーPrincipalとトークンデータのイテレータを返す
+    // `postupgrade`を実行する際に使用される
+    public func entries() : Iter.Iter<(Principal, HashMap.HashMap<T.Token, Nat>)> {
+      balance_book.entries();
+    };
+    
+    // 保存されているデータの量を返す
+    // `postupgrade`を実行する際に使用される
+    public func size() : Nat {
+      balance_book.size();
+    };
+    
     public func get(user : Principal) : ?HashMap.HashMap<T.Token, Nat> {
       return balance_book.get(user);
     };

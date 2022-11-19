@@ -32,6 +32,7 @@ export const UserBoard = (props) => {
     // ユーザーが保有するトークン量を取得
     const balance
       = await tokens[updateIndex].canister.balanceOf(userPrincipal);
+    console.log("user balance," + balance);
     // ユーザーがDEXに預けたトークン量を取得
     const dexBalance
       = await DEX.getBalance(
